@@ -8,4 +8,4 @@ December 1st and 2nd 2018.
 Dependencies:
 
  - [xwiimote](https://github.com/dvdhrm/xwiimote) \[[AUR](https://aur.archlinux.org/packages/xwiimote-git/)\]
- - [Python bindings for xwiimote](https://github.com/dvdhrm/xwiimote-bindings)
+ - [Python bindings for xwiimote](https://github.com/dvdhrm/xwiimote-bindings) \[[AUR](https://aur.archlinux.org/packages/python-xwiimote-git/)\]
