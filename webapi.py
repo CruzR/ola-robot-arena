@@ -49,7 +49,8 @@ def ipc_thread():
                 positions[:] = msg
 
 def webapi_thread():
-    app.run(host='0.0.0.0', port=8000)
+    ssl = {'cert': 'cert.pem', 'key': 'key.pem'}
+    app.run(host='0.0.0.0', port=8000, ssl=ssl)
 
 
 if __name__ == '__main__':
