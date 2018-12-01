@@ -59,6 +59,8 @@ def wiimote_thread():
                             except:
                                 dead_clients.add(client)
                         clients -= dead_clients
+                        for client in dead_clients:
+                            client.close()
                     else:
                         print('event: {}'.format(ev.type))
 
