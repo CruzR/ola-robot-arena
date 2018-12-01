@@ -2,6 +2,7 @@
 
 
 import json
+import os
 import socket
 import threading
 
@@ -20,6 +21,22 @@ async def get_positions(request):
     with pos_lock:
         _positions = positions[:]
     return json_response([{"x": p[0], "y": p[1]} for p in _positions])
+
+
+participant_lock = threading.Lock()
+participants = []
+
+@app.route("/participants", methods=['POST'])
+async def post_participants(request):
+    with participant_lock:
+        index = len(participants)
+        if index < 4:
+            token = os.urandom(32).hex()
+            participants.append({'name': request.json['name'], 'color': request.json['color'], 'token': token})
+    if index < 4:
+        return json_response({'slot': index, 'token': token})
+    else:
+        return json_response({'error': 'all slots taken'}, status=403)
 
 
 def ipc_thread():
