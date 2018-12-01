@@ -37,7 +37,7 @@ openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365
 Start xwiimote-server:
 
 ```
-python robot_control.py
+python xwiimote_server.py
 ```
 
 Start web API:
