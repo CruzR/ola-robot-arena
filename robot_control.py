@@ -1,12 +1,11 @@
 #!/usr/bin/python
 
 
-import queue
+import json
 import select
+import socket
 import threading
 
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 import xwiimote
 
 
@@ -21,69 +20,49 @@ def xwiimote_paths():
     return paths
 
 
-pos_lock = threading.Lock()
-xvals = [0, 0, 0, 0]
-yvals = [0, 0, 0, 0]
-
-accel_lock = threading.Lock()
-accel = [0.0, 0.0, 0.0]
-
-
-def display_thread():
-    """Display IR positions in a matplotlib window.
-
-    Needs to be run as the main thread, because the Qt backend of matplotlib
-    cannot handle running in any other thread.
-    """
-
-    fig, ax = plt.subplots()
-    ax.set_xlim(0, 1024)
-    ax.set_ylim(0, 1024)
-    ax.set_xticks(range(0, 1025, 256))
-    ax.set_yticks(range(0, 1025, 256))
-    ax.grid(linestyle='--')
-    scatter = ax.scatter(xvals, yvals, c='brgy')
-
-    def update(frame):
-        with pos_lock:
-            _xvals = xvals[:]
-            _yvals = yvals[:]
-        with accel_lock:
-            _accel = accel[:]
-        scatter.set_offsets([[_xvals[i], _yvals[i]] for i in range(4)])
-
-    animation = FuncAnimation(fig, update, interval=100)
-    plt.show()
-
-
 def wiimote_thread():
     """Continuously wait for Wiimote events and process them."""
     p = xwiimote_paths()[0]
     ev = xwiimote.event()
     iface = xwiimote.iface(p)
-    iface.open(xwiimote.IFACE_ACCEL|xwiimote.IFACE_IR)
-    fd = iface.get_fd()
-    ep = select.epoll.fromfd(fd)
-    while True:
-        events = dict(ep.poll())
-        iface.dispatch(ev)
-        if ev.type == xwiimote.EVENT_ACCEL:
-            _accel = ev.get_abs(0)
-            with accel_lock:
-                accel[:] = _accel
-        elif ev.type == xwiimote.EVENT_IR:
-            abs_ = [ev.get_abs(n) for n in range(4)]
-            _xvals = [v[0] for v in abs_]
-            _yvals = [v[1] for v in abs_]
-            with pos_lock:
-                xvals[:] = _xvals
-                yvals[:] = _yvals
-        else:
-            print('event: {}'.format(ev.type))
-    iface.close(xwiimote.IFACE_ACCEL|xwiimote.IFACE_IR)
+    iface.open(xwiimote.IFACE_IR)
+    with socket.socket(socket.AF_UNIX, type=socket.SOCK_STREAM) as sock:
+        sock.bind('/tmp/xwiimote-server.sock')
+        sock.listen()
+
+        ep = select.epoll()
+        ep.register(sock.fileno(), select.EPOLLIN)
+        ep.register(iface.get_fd(), select.EPOLLIN)
+
+        clients = set()
+
+        while True:
+            events = ep.poll()
+
+            for fileno, event in events:
+                if fileno == sock.fileno():
+                    print(event)
+                    if not (event & select.EPOLLIN) == select.EPOLLIN:
+                        continue
+                    clients.add(sock.accept()[0])
+
+                elif fileno == iface.get_fd():
+                    iface.dispatch(ev)
+                    if ev.type == xwiimote.EVENT_IR:
+                        abs_ = [ev.get_abs(n)[:2] for n in range(4)]
+                        positions = (json.dumps(abs_) + '\n').encode('ascii')
+                        dead_clients = set()
+                        for client in clients:
+                            try:
+                                client.send(positions)
+                            except:
+                                dead_clients.add(client)
+                        clients -= dead_clients
+                    else:
+                        print('event: {}'.format(ev.type))
+
+    iface.close(xwiimote.IFACE_IR)
 
 
 if __name__ == '__main__':
-    wiimote_thr = threading.Thread(target=wiimote_thread, daemon=True)
-    wiimote_thr.start()
-    display_thread()
+    wiimote_thread()
