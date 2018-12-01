@@ -2,6 +2,8 @@
 
 
 import json
+import os
+import os.path
 import select
 import socket
 import threading
@@ -27,6 +29,8 @@ def wiimote_thread():
     iface = xwiimote.iface(p)
     iface.open(xwiimote.IFACE_IR)
     with socket.socket(socket.AF_UNIX, type=socket.SOCK_STREAM) as sock:
+        if os.path.exists('/tmp/xwiimote-server.sock'):
+            os.remove('/tmp/xwiimote-server.sock')
         sock.bind('/tmp/xwiimote-server.sock')
         sock.listen()
 
@@ -41,9 +45,6 @@ def wiimote_thread():
 
             for fileno, event in events:
                 if fileno == sock.fileno():
-                    print(event)
-                    if not (event & select.EPOLLIN) == select.EPOLLIN:
-                        continue
                     clients.add(sock.accept()[0])
 
                 elif fileno == iface.get_fd():
