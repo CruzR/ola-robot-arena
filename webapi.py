@@ -7,7 +7,7 @@ import socket
 import threading
 
 from sanic import Sanic
-from sanic.response import json as json_response
+from sanic import response
 
 
 pos_lock = threading.Lock()
@@ -16,11 +16,16 @@ positions = [[0, 0], [0, 0], [0, 0], [0, 0]]
 app = Sanic()
 
 
+@app.route("/")
+async def get_root(request):
+    return await response.file('docs.html')
+
+
 @app.route("/positions")
 async def get_positions(request):
     with pos_lock:
         _positions = positions[:]
-    return json_response([{"x": p[0], "y": p[1]} for p in _positions])
+    return response.json([{"x": p[0], "y": p[1]} for p in _positions])
 
 
 participant_lock = threading.Lock()
@@ -34,9 +39,9 @@ async def post_participants(request):
             token = os.urandom(32).hex()
             participants.append({'name': request.json['name'], 'color': request.json['color'], 'token': token})
     if index < 4:
-        return json_response({'slot': index, 'token': token})
+        return response.json({'slot': index, 'token': token})
     else:
-        return json_response({'error': 'all slots taken'}, status=403)
+        return response.json({'error': 'all slots taken'}, status=403)
 
 
 def ipc_thread():
