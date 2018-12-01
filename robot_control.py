@@ -22,6 +22,19 @@ def xwiimote_paths():
     return paths
 
 
+def send_positions_event(positions, clients):
+    positions_buf = (json.dumps(positions) + '\n').encode('ascii')
+    dead_clients = set()
+    for client in clients:
+        try:
+            client.send(positions_buf)
+        except:
+            dead_clients.add(client)
+    clients -= dead_clients
+    for client in dead_clients:
+        client.close()
+
+
 def wiimote_thread():
     """Continuously wait for Wiimote events and process them."""
     p = xwiimote_paths()[0]
@@ -50,17 +63,8 @@ def wiimote_thread():
                 elif fileno == iface.get_fd():
                     iface.dispatch(ev)
                     if ev.type == xwiimote.EVENT_IR:
-                        abs_ = [ev.get_abs(n)[:2] for n in range(4)]
-                        positions = (json.dumps(abs_) + '\n').encode('ascii')
-                        dead_clients = set()
-                        for client in clients:
-                            try:
-                                client.send(positions)
-                            except:
-                                dead_clients.add(client)
-                        clients -= dead_clients
-                        for client in dead_clients:
-                            client.close()
+                        positions = [ev.get_abs(n)[:2] for n in range(4)]
+                        send_positions_event(positions, clients)
                     else:
                         print('event: {}'.format(ev.type))
 
